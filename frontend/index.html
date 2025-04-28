@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Liste des Pods Kubernetes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 30px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Liste des Pods</h1>
+
+<table id="podsTable">
+    <thead>
+        <tr>
+            <th>Nom</th>
+            <th>Namespace</th>
+            <th>Statut</th>
+            <th>Date de création</th>
+        </tr>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
+
+<script>
+async function fetchPods() {
+    try {
+        const response = await fetch('/api/pods');
+        const data = await response.json();
+        const tableBody = document.querySelector('#podsTable tbody');
+        tableBody.innerHTML = '';
+
+        if (data.items && Array.isArray(data.items)) {
+            data.items.forEach(pod => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${pod.metadata.name}</td>
+                    <td>${pod.metadata.namespace}</td>
+                    <td>${pod.status.phase}</td>
+                    <td>${new Date(pod.metadata.creationTimestamp).toLocaleString()}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        } else {
+            tableBody.innerHTML = '<tr><td colspan="4">Aucun pod trouvé.</td></tr>';
+        }
+    } catch (error) {
+        console.error('Erreur lors de la récupération des pods:', error);
+    }
+}
+
+// Charger au démarrage
+fetchPods();
+
+// Auto-refresh (optionnel)
+setInterval(fetchPods, 10000);
+</script>
+
+</body>
+</html>
