@@ -6,71 +6,94 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 30px;
+            padding: 20px;
+        }
+        button {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #3498db;
+            border: none;
+            color: white;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #2980b9;
         }
         table {
-            border-collapse: collapse;
             width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
         }
         th, td {
             border: 1px solid #ddd;
             padding: 8px;
+            text-align: left;
         }
         th {
-            background-color: #f4f4f4;
+            background-color: #3498db;
+            color: white;
         }
     </style>
 </head>
 <body>
+    <h1>Liste des Pods Kubernetes</h1>
 
-<h1>Liste des Pods</h1>
+    <button id="filter-failed">Afficher seulement les pods Failed</button>
+    <button id="show-all">Afficher tous les pods</button>
 
-<table id="podsTable">
-    <thead>
-        <tr>
-            <th>Nom</th>
-            <th>Namespace</th>
-            <th>Statut</th>
-            <th>Date de création</th>
-        </tr>
-    </thead>
-    <tbody>
-    </tbody>
-</table>
+    <table id="pods-table">
+        <thead>
+            <tr>
+                <th>Namespace</th>
+                <th>Nom</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Les pods seront insérés ici -->
+        </tbody>
+    </table>
 
-<script>
-async function fetchPods() {
-    try {
-        const response = await fetch('/api/pods');
-        const data = await response.json();
-        const tableBody = document.querySelector('#podsTable tbody');
-        tableBody.innerHTML = '';
+    <script>
+        let allPods = [];
 
-        if (data.items && Array.isArray(data.items)) {
-            data.items.forEach(pod => {
+        async function fetchPods() {
+            const res = await fetch('/api/pods');
+            const data = await res.json();
+            if (data.items) {
+                allPods = data.items;
+                renderPods(allPods);
+            }
+        }
+
+        function renderPods(pods) {
+            const tbody = document.querySelector('#pods-table tbody');
+            tbody.innerHTML = '';
+
+            pods.forEach(pod => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${pod.metadata.name}</td>
                     <td>${pod.metadata.namespace}</td>
+                    <td>${pod.metadata.name}</td>
                     <td>${pod.status.phase}</td>
-                    <td>${new Date(pod.metadata.creationTimestamp).toLocaleString()}</td>
                 `;
-                tableBody.appendChild(row);
+                tbody.appendChild(row);
             });
-        } else {
-            tableBody.innerHTML = '<tr><td colspan="4">Aucun pod trouvé.</td></tr>';
         }
-    } catch (error) {
-        console.error('Erreur lors de la récupération des pods:', error);
-    }
-}
 
-// Charger au démarrage
-fetchPods();
+        document.getElementById('filter-failed').addEventListener('click', () => {
+            const failedPods = allPods.filter(pod => pod.status.phase === 'Failed');
+            renderPods(failedPods);
+        });
 
-// Auto-refresh (optionnel)
-setInterval(fetchPods, 10000);
-</script>
+        document.getElementById('show-all').addEventListener('click', () => {
+            renderPods(allPods);
+        });
 
+        // Chargement initial
+        fetchPods();
+    </script>
 </body>
 </html>
