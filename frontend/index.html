@@ -5,56 +5,102 @@
 <title>Liste des Pods Kubernetes</title>
 <style>
 body {
-font-family: Arial, sans-serif;
-padding: 20px;
- }
+    font-family: Arial, sans-serif;
+    padding: 20px;
+}
 button {
-margin-bottom: 20px;
-padding: 10px;
-background-color: #3498db;
-border: none;
-color: white;
-font-size: 16px;
-border-radius: 5px;
-cursor: pointer;
-margin-right: 10px;
- }
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #3498db;
+    border: none;
+    color: white;
+    font-size: 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-right: 10px;
+}
 button:hover {
-background-color: #2980b9;
- }
+    background-color: #2980b9;
+}
 table {
-width: 100%;
-border-collapse: collapse;
-margin-top: 10px;
- }
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
 th, td {
-border: 1px solid #ddd;
-padding: 8px;
-text-align: left;
- }
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
 th {
-background-color: #3498db;
-color: white;
- }
+    background-color: #3498db;
+    color: white;
+}
 .status-running {
-color: green;
-font-weight: bold;
- }
+    color: green;
+    font-weight: bold;
+}
 .status-failed {
-color: red;
-font-weight: bold;
- }
+    color: red;
+    font-weight: bold;
+}
 .status-other {
-color: gray;
-font-weight: bold;
- }
+    color: gray;
+    font-weight: bold;
+}
 .restarts-high {
-color: red;
-font-weight: bold;
+    color: red;
+    font-weight: bold;
 }
 .restarts-warning {
-color: orange;
-font-weight: bold;
+    color: orange;
+    font-weight: bold;
+}
+.clickable {
+    cursor: pointer;
+    text-decoration: underline;
+    color: #3498db;
+}
+.logs-modal {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+}
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-height: 80%;
+    overflow-y: auto;
+}
+.close-button {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.close-button:hover {
+    color: black;
+}
+.logs-container {
+    background-color: #f5f5f5;
+    padding: 10px;
+    border-radius: 5px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    overflow-x: auto;
+}
+.container-selector {
+    margin-bottom: 10px;
 }
 </style>
 </head>
@@ -63,77 +109,225 @@ font-weight: bold;
 <button id="filter-failed">Afficher seulement les pods Failed</button>
 <button id="show-all">Afficher tous les pods</button>
 <table id="pods-table">
-<thead>
-<tr>
-<th>Namespace</th>
-<th>Nom</th>
-<th>Status</th>
-<th>Ready</th>
-<th>Redémarrages</th>
-</tr>
-</thead>
-<tbody>
-<!-- Les pods seront insérés ici -->
-</tbody>
+    <thead>
+        <tr>
+            <th>Namespace</th>
+            <th>Nom</th>
+            <th>Status</th>
+            <th>Ready</th>
+            <th>Redémarrages</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        <!-- Les pods seront insérés ici -->
+    </tbody>
 </table>
+
+<!-- Modal pour afficher les logs -->
+<div id="logs-modal" class="logs-modal">
+    <div class="modal-content">
+        <span class="close-button">&times;</span>
+        <h2 id="modal-title">Logs du conteneur</h2>
+        <div id="container-selector" class="container-selector">
+            <!-- Les sélecteurs de conteneurs seront insérés ici -->
+        </div>
+        <div id="previous-logs-selector" class="container-selector">
+            <!-- Les sélecteurs pour les logs précédents seront insérés ici -->
+        </div>
+        <div id="logs-container" class="logs-container">
+            <!-- Les logs seront insérés ici -->
+        </div>
+    </div>
+</div>
+
 <script>
 let allPods = [];
 async function fetchPods() {
-const res = await fetch('/api/pods');
-const data = await res.json();
-if (data.items) {
-allPods = data.items;
-renderPods(allPods);
- }
- }
-function getStatusClass(status) {
-if (status === 'Running') return 'status-running';
-if (status === 'Failed') return 'status-failed';
-return 'status-other';
- }
-function getRestartsClass(restarts) {
-if (restarts >= 5) return 'restarts-high';
-if (restarts >= 3) return 'restarts-warning';
-return '';
+    const res = await fetch('/api/pods');
+    const data = await res.json();
+    if (data.items) {
+        allPods = data.items;
+        renderPods(allPods);
+    }
 }
+
+function getStatusClass(status) {
+    if (status === 'Running') return 'status-running';
+    if (status === 'Failed') return 'status-failed';
+    return 'status-other';
+}
+
+function getRestartsClass(restarts) {
+    if (restarts >= 5) return 'restarts-high';
+    if (restarts >= 3) return 'restarts-warning';
+    return '';
+}
+
 function renderPods(pods) {
-const tbody = document.querySelector('#pods-table tbody');
-tbody.innerHTML = '';
-pods.forEach(pod => {
-const namespace = pod.metadata.namespace;
-const name = pod.metadata.name;
-const status = pod.status.phase;
-let readyContainers = 0;
-let totalContainers = 0;
-let totalRestarts = 0;
-if (pod.status.containerStatuses) {
-totalContainers = pod.status.containerStatuses.length;
-readyContainers = pod.status.containerStatuses.filter(c => c.ready).length;
-// Calculer le nombre total de redémarrages pour tous les conteneurs du pod
-totalRestarts = pod.status.containerStatuses.reduce((sum, container) => {
-return sum + (container.restartCount || 0);
-}, 0);
- }
-const statusClass = getStatusClass(status);
-const restartsClass = getRestartsClass(totalRestarts);
-const row = document.createElement('tr');
-row.innerHTML = `
- <td>${namespace}</td>
- <td>${name}</td>
- <td class="${statusClass}">${status}</td>
- <td>${readyContainers}/${totalContainers}</td>
- <td class="${restartsClass}">${totalRestarts}</td>
- `;
-tbody.appendChild(row);
- });
- }
+    const tbody = document.querySelector('#pods-table tbody');
+    tbody.innerHTML = '';
+    pods.forEach(pod => {
+        const namespace = pod.metadata.namespace;
+        const name = pod.metadata.name;
+        const status = pod.status.phase;
+        let readyContainers = 0;
+        let totalContainers = 0;
+        let totalRestarts = 0;
+        if (pod.status.containerStatuses) {
+            totalContainers = pod.status.containerStatuses.length;
+            readyContainers = pod.status.containerStatuses.filter(c => c.ready).length;
+            // Calculer le nombre total de redémarrages pour tous les conteneurs du pod
+            totalRestarts = pod.status.containerStatuses.reduce((sum, container) => {
+                return sum + (container.restartCount || 0);
+            }, 0);
+        }
+        const statusClass = getStatusClass(status);
+        const restartsClass = getRestartsClass(totalRestarts);
+        const row = document.createElement('tr');
+        
+        let actionsCell = '';
+        if (totalRestarts > 0) {
+            actionsCell = `<span class="clickable" onclick="showLogs('${namespace}', '${name}')">Voir logs</span>`;
+        }
+        
+        row.innerHTML = `
+            <td>${namespace}</td>
+            <td>${name}</td>
+            <td class="${statusClass}">${status}</td>
+            <td>${readyContainers}/${totalContainers}</td>
+            <td class="${restartsClass}">${totalRestarts}</td>
+            <td>${actionsCell}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+async function showLogs(namespace, podName) {
+    // Trouver le pod correspondant
+    const pod = allPods.find(p => p.metadata.namespace === namespace && p.metadata.name === podName);
+    if (!pod || !pod.status.containerStatuses) return;
+
+    const modal = document.getElementById('logs-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const containerSelector = document.getElementById('container-selector');
+    const previousLogsSelector = document.getElementById('previous-logs-selector');
+    const logsContainer = document.getElementById('logs-container');
+    
+    modal.style.display = 'block';
+    modalTitle.textContent = `Logs du pod: ${namespace}/${podName}`;
+    
+    // Préparer le sélecteur de conteneurs
+    containerSelector.innerHTML = '<label>Conteneur: </label>';
+    const containerSelect = document.createElement('select');
+    containerSelect.id = 'container-select';
+    
+    pod.status.containerStatuses.forEach(container => {
+        const option = document.createElement('option');
+        option.value = container.name;
+        option.textContent = `${container.name} (${container.restartCount} redémarrages)`;
+        containerSelect.appendChild(option);
+    });
+    
+    containerSelector.appendChild(containerSelect);
+    
+    // Fonction pour charger les logs du conteneur sélectionné
+    const loadLogs = async (containerName, previousFlag = '') => {
+        logsContainer.textContent = 'Chargement des logs...';
+        try {
+            const res = await fetch(`/api/logs/${namespace}/${podName}/${containerName}${previousFlag}`);
+            if (!res.ok) {
+                throw new Error(`Erreur HTTP: ${res.status}`);
+            }
+            const logs = await res.text();
+            logsContainer.textContent = logs || 'Aucun log disponible';
+        } catch (error) {
+            logsContainer.textContent = `Erreur lors du chargement des logs: ${error.message}`;
+        }
+    };
+    
+    // Charger les logs pour le premier conteneur par défaut
+    if (pod.status.containerStatuses.length > 0) {
+        const firstContainer = pod.status.containerStatuses[0];
+        
+        // Créer le sélecteur pour les logs précédents
+        previousLogsSelector.innerHTML = '<label>Version: </label>';
+        const previousSelect = document.createElement('select');
+        previousSelect.id = 'previous-select';
+        
+        const currentOption = document.createElement('option');
+        currentOption.value = '';
+        currentOption.textContent = 'Conteneur actuel';
+        previousSelect.appendChild(currentOption);
+        
+        if (firstContainer.restartCount > 0) {
+            for (let i = 0; i < firstContainer.restartCount; i++) {
+                const option = document.createElement('option');
+                option.value = `?previous=true&index=${i}`;
+                option.textContent = `Version précédente #${i + 1}`;
+                previousSelect.appendChild(option);
+            }
+        }
+        
+        previousLogsSelector.appendChild(previousSelect);
+        
+        // Charger les logs initiaux
+        await loadLogs(firstContainer.name);
+        
+        // Événements pour les sélecteurs
+        containerSelect.addEventListener('change', async () => {
+            const selectedContainer = containerSelect.value;
+            const selectedContainerObj = pod.status.containerStatuses.find(c => c.name === selectedContainer);
+            
+            // Mettre à jour le sélecteur de versions précédentes
+            previousSelect.innerHTML = '';
+            const currentOption = document.createElement('option');
+            currentOption.value = '';
+            currentOption.textContent = 'Conteneur actuel';
+            previousSelect.appendChild(currentOption);
+            
+            if (selectedContainerObj && selectedContainerObj.restartCount > 0) {
+                for (let i = 0; i < selectedContainerObj.restartCount; i++) {
+                    const option = document.createElement('option');
+                    option.value = `?previous=true&index=${i}`;
+                    option.textContent = `Version précédente #${i + 1}`;
+                    previousSelect.appendChild(option);
+                }
+            }
+            
+            await loadLogs(selectedContainer, previousSelect.value);
+        });
+        
+        previousSelect.addEventListener('change', async () => {
+            const selectedContainer = containerSelect.value;
+            const selectedPrevious = previousSelect.value;
+            await loadLogs(selectedContainer, selectedPrevious);
+        });
+    }
+}
+
+// Fermer la modal
+document.querySelector('.close-button').addEventListener('click', () => {
+    document.getElementById('logs-modal').style.display = 'none';
+});
+
+// Fermer la modal si on clique à l'extérieur
+window.addEventListener('click', (event) => {
+    const modal = document.getElementById('logs-modal');
+    if (event.target === modal) {
+        modal.style.display = 'none';
+    }
+});
+
 document.getElementById('filter-failed').addEventListener('click', () => {
-const failedPods = allPods.filter(pod => pod.status.phase === 'Failed');
-renderPods(failedPods);
- });
+    const failedPods = allPods.filter(pod => pod.status.phase === 'Failed');
+    renderPods(failedPods);
+});
+
 document.getElementById('show-all').addEventListener('click', () => {
-renderPods(allPods);
- });
+    renderPods(allPods);
+});
+
 // Chargement initial
 fetchPods();
 </script>
