@@ -17,6 +17,7 @@
             font-size: 16px;
             border-radius: 5px;
             cursor: pointer;
+            margin-right: 10px;
         }
         button:hover {
             background-color: #2980b9;
@@ -35,6 +36,18 @@
             background-color: #3498db;
             color: white;
         }
+        .status-running {
+            color: green;
+            font-weight: bold;
+        }
+        .status-failed {
+            color: red;
+            font-weight: bold;
+        }
+        .status-other {
+            color: gray;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -49,7 +62,7 @@
                 <th>Namespace</th>
                 <th>Nom</th>
                 <th>Status</th>
-                <th>Ready</th> <!-- Nouvelle colonne -->
+                <th>Ready</th>
             </tr>
         </thead>
         <tbody>
@@ -69,6 +82,12 @@
             }
         }
 
+        function getStatusClass(status) {
+            if (status === 'Running') return 'status-running';
+            if (status === 'Failed') return 'status-failed';
+            return 'status-other';
+        }
+
         function renderPods(pods) {
             const tbody = document.querySelector('#pods-table tbody');
             tbody.innerHTML = '';
@@ -78,7 +97,6 @@
                 const name = pod.metadata.name;
                 const status = pod.status.phase;
 
-                // Calcul du Ready
                 let readyContainers = 0;
                 let totalContainers = 0;
 
@@ -87,11 +105,13 @@
                     readyContainers = pod.status.containerStatuses.filter(c => c.ready).length;
                 }
 
+                const statusClass = getStatusClass(status);
+
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${namespace}</td>
                     <td>${name}</td>
-                    <td>${status}</td>
+                    <td class="${statusClass}">${status}</td>
                     <td>${readyContainers}/${totalContainers}</td>
                 `;
                 tbody.appendChild(row);
