@@ -49,6 +49,7 @@
                 <th>Namespace</th>
                 <th>Nom</th>
                 <th>Status</th>
+                <th>Ready</th> <!-- Nouvelle colonne -->
             </tr>
         </thead>
         <tbody>
@@ -73,11 +74,25 @@
             tbody.innerHTML = '';
 
             pods.forEach(pod => {
+                const namespace = pod.metadata.namespace;
+                const name = pod.metadata.name;
+                const status = pod.status.phase;
+
+                // Calcul du Ready
+                let readyContainers = 0;
+                let totalContainers = 0;
+
+                if (pod.status.containerStatuses) {
+                    totalContainers = pod.status.containerStatuses.length;
+                    readyContainers = pod.status.containerStatuses.filter(c => c.ready).length;
+                }
+
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${pod.metadata.namespace}</td>
-                    <td>${pod.metadata.name}</td>
-                    <td>${pod.status.phase}</td>
+                    <td>${namespace}</td>
+                    <td>${name}</td>
+                    <td>${status}</td>
+                    <td>${readyContainers}/${totalContainers}</td>
                 `;
                 tbody.appendChild(row);
             });
